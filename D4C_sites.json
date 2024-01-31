@@ -1,0 +1,36 @@
+{
+    "sites": [
+        {
+            "name": "Métropole Grenoble",
+            "site_url": "https://data.metropolegrenoble.fr/"
+        },
+        {
+            "name": "OBS Foncier Martinique",
+            "site_url": "https://www.obs-foncier-martinique.fr/"
+        },
+        {
+            "name": "ODEC BFC",
+            "site_url": "https://odec-bfc.fr/"
+        },
+        {
+            "name": "Agglomération La Rochelle",
+            "site_url": "https://opendata.agglo-larochelle.fr/"
+        },
+        {
+            "name": "OFER BFC",
+            "site_url": "https://oferbfc.fr/"
+        },
+        {
+            "name": "Grand Est",
+            "site_url": "https://www.datagrandest.fr/data4citizen"
+        },
+        {
+            "name": "ANFR",
+            "site_url": "https://data.anfr.fr/"
+        },
+        {
+            "name": "Libourne",
+            "site_url": "https://data.libourne.fr"
+        }
+    ]
+}
