@@ -1599,7 +1599,7 @@ class d4cAPI:
                 # file to upload
                 fichier = couche.dataProvider().dataSourceUri()
                 
-                if couche_path.startswith('memory?'):
+                if couche_path.startswith('memory?') or couche_path.startswith('dbname='):
                     # Si la couche est chargée en mémoire, l'enregistrer dans resources au format geojson
             
                     try: 
