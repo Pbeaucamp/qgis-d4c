@@ -1440,21 +1440,20 @@ class d4cAPI:
             nom_couche = item.text()
             couche = projet.mapLayersByName(nom_couche)[0]
             couche_path = couche.dataProvider().dataSourceUri().split('|')[0]
-
             # file to upload
             fichier = couche.dataProvider().dataSourceUri()
-            if couche_path.startswith('memory?'):
-                # Si la couche est chargée en mémoire, l'enregistrer dans resources au format geojson
-            
-                try: 
-                    couche_path = self.saveFile_folder + '\\' +  couche.name().replace('.csv', '') + '.geojson'
+            if couche_path.startswith('memory?') or couche_path.startswith('dbname='):
+                # Si la couche est chargée en mémoire ou alors en db, l'enregistrer dans resources au format geojson
+                #try:
+                couche_path = self.saveFile_folder + '\\' +  couche.name().replace('.csv', '') + '.geojson'
 
-                    self.save_layer_as_geojson(couche, couche_path)
+                self.save_layer_as_geojson(couche, couche_path)
                     
-                except Exception as e:
-                    self.show_error_message(self.tr('Erreur lors de la sauvegarde de la couche, veuillez l\'enregistrer sur le disque.'), e)
-                    return
+                # except Exception as e:
+                #     self.show_error_message(self.tr('Erreur lors de la sauvegarde de la couche, veuillez l\'enregistrer sur le disque.'), e)
+                #     return
                 fichier = couche_path
+
             if not os.path.exists(couche_path):
                 self.show_error_message(self.tr('Erreur lors de la sauvegarde de la couche, veuillez l\'enregistrer sur le disque.'))
                 return
@@ -1463,7 +1462,6 @@ class d4cAPI:
             
             # API URL
             url = self.dlg.siteField.toPlainText()+ '/d4c/api/v1/dataset/resource_add'
-
              
 
             # request parameters
@@ -1716,8 +1714,7 @@ class d4cAPI:
         # Initialiser l'application QGIS
         QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
         Processing.initialize()
-        if layer.type() == QgsMapLayer.VectorLayer and layer.dataProvider().name() == 'memory':
-            print('je suis dans le if')
+        if layer.type() == QgsMapLayer.VectorLayer and (layer.dataProvider().name() == 'memory' or layer.dataProvider().name() == 'postgres'):
             # We do not manage sanitized name colision (if your
             # layer name is the same, code will try to write to
             # a GPKG with the same name and the same layer...)
