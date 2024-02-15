@@ -12,8 +12,8 @@ email=matthieu.serek@bpm-conseil.com
 
 about=Using D4C API to manipulate CKAN data
 
-tracker=https://github.com/Riyolait/d4c-extension
-repository=https://github.com/Riyolait/d4c-extension
+tracker=https://gitlab.bpm-conseil.com/data4citizen/qgis-d4c
+repository=https://gitlab.bpm-conseil.com/data4citizen/qgis-d4c
 # End of mandatory metadata
 
 # Recommended items:
@@ -25,7 +25,7 @@ hasProcessingProvider=no
 # Tags are comma separated with spaces allowed
 tags=python
 
-homepage=https://github.com/Riyolait/d4c-extension
+homepage=https://gitlab.bpm-conseil.com/data4citizen/qgis-d4c
 category=Plugins
 icon=icon.png
 # experimental flag
