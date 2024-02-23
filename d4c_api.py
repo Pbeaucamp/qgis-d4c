@@ -47,6 +47,7 @@ from .d4c_api_dialog_multiple_import import Ui_DialogImport
 from .d4c_api_dialog_geoparams import Ui_GeoParams
 from .d4c_api_dialog_deletegeoparam import Ui_DeleteGeoParam
 import os
+import pathlib
 import requests
 import json
 import subprocess
@@ -89,60 +90,65 @@ class d4cAPI:
         # Save reference to the QGIS interface
         self.iface = iface
         # initialize plugin directory
-        self.plugin_dir = os.path.dirname(__file__)
+        self.plugin_dir = pathlib.Path(__file__).resolve().parent
         # initialize locale
         self.translator = QTranslator()
         self.lang = None
         self.saveFile_folder = None
         # Set up the destination folder
-        if not os.path.exists(os.path.expanduser("~") + '/.d4cplugin/'):
-            os.makedirs(os.path.expanduser("~") + '/.d4cplugin/')
-            
-        # Chargez les sessions existantes depuis le fichier JSON
-        destination_folder = os.path.expanduser('~/.d4cplugin')  # Modifier le chemin selon vos besoins
-        json_file_path = os.path.join(destination_folder, 'logs.json')
-
-        if not(os.path.exists(self.plugin_dir + '/resources/')):
-            os.makedirs(self.plugin_dir + '/resources/')
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin'):
+            os.makedirs(pathlib.Path.home() / '.d4cplugin')
         
-        if not(os.path.exists(json_file_path)):
+        # Chargez les sessions existantes depuis le fichier JSON
+        json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
+
+        # rename file logs.json to history.json
+        if pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin' / 'logs.json'):
+            os.rename(pathlib.Path.home() / '.d4cplugin' / 'logs.json', pathlib.Path.home() / '.d4cplugin' / 'history.json')
+            # json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
+
+        if not pathlib.Path.exists(self.plugin_dir / 'resources'):
+            os.makedirs(self.plugin_dir / 'resources')
+        
+        if not(pathlib.Path.exists(json_file_path)):
             data = {
                 "last_session": {
                     "sessions": []
                 },
                 "lang": "fr",
-                "folder_path" : self.plugin_dir + '/resources/'
+                "folder_path" : str(self.plugin_dir / 'resources')
             }
             # Enregistrez les données mises à jour dans le fichier JSON
-            with open(json_file_path, 'w') as json_file:
+            # type windowpath into string to avoid error
+            with open(str(json_file_path), 'w') as json_file:
                 json.dump(data, json_file, indent=4)
             self.lang = 'fr'
-            self.saveFile_folder = self.plugin_dir + '/resources/'
+            self.saveFile_folder = str(self.plugin_dir / 'resources')
         else:
-            with open(json_file_path, 'r') as json_file:
+            with open(str(json_file_path), 'r') as json_file:
                 data = json.load(json_file)
                 self.lang = data['lang']
                 self.saveFile_folder = data['folder_path']
 
         # Déplacer les fichiers enums
-        if os.path.exists(self.plugin_dir + '/enums_geo.txt'):
-            if not(os.path.exists(os.path.expanduser('~/.d4cplugin/enums_geo.txt'))):
-                shutil.move(self.plugin_dir + '/enums_geo.txt', os.path.expanduser('~/.d4cplugin'))
+        if pathlib.Path.exists(self.plugin_dir / 'enums_geo.txt'):
+            if not(pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin' / 'enums_geo.txt')):
+                shutil.move(self.plugin_dir / 'enums_geo.txt', pathlib.Path.home() / '.d4cplugin')
             else:
-                os.remove(self.plugin_dir + '/enums_geo.txt')
-        
-        if os.path.exists(self.plugin_dir + '/enums_tuple_geo.txt'):
-            if not(os.path.exists(os.path.expanduser('~/.d4cplugin/enums_tuple_geo.txt'))):
-                shutil.move(self.plugin_dir + '/enums_tuple_geo.txt', os.path.expanduser('~/.d4cplugin'))
+                os.remove(self.plugin_dir / 'enums_geo.txt')
+
+        if pathlib.Path.exists(self.plugin_dir / 'enums_tuple_geo.txt'):
+            if not(pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin' / 'enums_tuple_geo.txt')):
+                shutil.move(self.plugin_dir / 'enums_tuple_geo.txt', pathlib.Path.home() / '.d4cplugin')
             else:
-                os.remove(self.plugin_dir + '/enums_tuple_geo.txt')
-        
-        if os.path.exists(self.plugin_dir + '/enums_cache_jdd.txt'):
-            if not(os.path.exists(os.path.expanduser('~/.d4cplugin/enums_cache_jdd.txt'))):
-                shutil.move(self.plugin_dir + '/enums_cache_jdd.txt', os.path.expanduser('~/.d4cplugin'))
+                os.remove(self.plugin_dir / 'enums_tuple_geo.txt')
+
+        if pathlib.Path.exists(self.plugin_dir / 'enums_cache_jdd.txt'):
+            if not(pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin' / 'enums_cache_jdd.txt')):
+                shutil.move(self.plugin_dir / 'enums_cache_jdd.txt', pathlib.Path.home() / '.d4cplugin')
             else:
-                os.remove(self.plugin_dir + '/enums_cache_jdd.txt')
-            
+                os.remove(self.plugin_dir / 'enums_cache_jdd.txt')
+           
         
         self.loadTranslation(self.lang)  # Charge la traduction française par défaut
         if self.lang == 'fr':
@@ -194,6 +200,8 @@ class d4cAPI:
 
         self.tableWidget = None
 
+        self.previousOpenDataResource = None
+
         self.layer1isSet = False
         self.layer2isSet = False
 
@@ -206,13 +214,10 @@ class d4cAPI:
     
     
     def loadTranslation(self, locale):
-        locale_path = os.path.join(
-        self.plugin_dir,
-        'i18n',
-        f'd4c_api_{locale}.qm')
+        locale_path = self.plugin_dir / 'i18n' / f'd4c_api_{locale}.qm'
 
-        if os.path.exists(locale_path):
-            self.translator.load(locale_path)
+        if pathlib.Path.exists(locale_path):
+            self.translator.load(str(locale_path))
             QCoreApplication.installTranslator(self.translator)
 
     # noinspection PyMethodMayBeStatic
@@ -339,8 +344,8 @@ class d4cAPI:
         self.uiParams = Ui_Params()
         self.uiParams.setupUi(self.windowParams)
         
-        france_icon_path = os.path.join(self.plugin_dir, 'img', 'france_icon.png')
-        uk_icon_path = os.path.join(self.plugin_dir, 'img', 'uk_icon.png') 
+        france_icon_path = str(self.plugin_dir / 'img' / 'france_icon.png')
+        uk_icon_path = str(self.plugin_dir / 'img' / 'uk_icon.png' )
 
         france_icon = QIcon(france_icon_path)
         uk_icon = QIcon(uk_icon_path)
@@ -348,21 +353,24 @@ class d4cAPI:
         self.uiParams.languageBox.addItem(france_icon, '')
         self.uiParams.languageBox.addItem(uk_icon, '')
         
-        json_file_path = os.path.expanduser("~") + '/.d4cplugin/logs.json'
-        if not(os.path.exists(json_file_path)):
+        json_file_path = pathlib.Path.home() /'.d4cplugin' / 'history.json'
+        if pathlib.Path.exists(pathlib.Path.home() /'.d4cplugin' / 'logs.json'):
+            os.rename(pathlib.Path.home() /'.d4cplugin' / 'logs.json', json_file_path)
+        
+        if not(pathlib.Path.exists(json_file_path)):
             data = {
                 "last_session": {
                     "sessions": []
                 },
                 "lang": "fr",
-                "folder_path" : self.plugin_dir + '/resources/'
+                "folder_path" : str(self.plugin_dir / 'resources')
             }
                     # Enregistrez les données mises à jour dans le fichier JSON
-            with open(json_file_path, 'w') as json_file:
+            with open(str(json_file_path), 'w') as json_file:
                 json.dump(data, json_file, indent=4)
-            resource_file_path = self.plugin_dir + '/resources/'
+            resource_file_path = self.plugin_dir / 'resources'
         else :
-            with open(json_file_path, 'r') as json_file:
+            with open(str(json_file_path), 'r') as json_file:
                 data = json.load(json_file)
                 resource_file_path = data['folder_path']
                 self.uiParams.lineEdit.setText(resource_file_path)
@@ -381,7 +389,7 @@ class d4cAPI:
     #Sauvegarde les paramètres
     def saveSettings(self):
         
-        json_file_path = os.path.expanduser("~") + '/.d4cplugin/logs.json'
+        json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
 
         language_id = self.uiParams.languageBox.currentIndex()
         if language_id == 0:
@@ -389,16 +397,16 @@ class d4cAPI:
         elif language_id == 1:
             language = 'en'
         
-        new_folder_path = self.uiParams.lineEdit.text()
+        new_folder_path = pathlib.Path(self.uiParams.lineEdit.text())
 
         if new_folder_path != '':
-            if not os.path.exists(new_folder_path):
+            if not pathlib.Path.exists(new_folder_path):
                 os.makedirs(new_folder_path)
-            with open(json_file_path, 'r') as json_file:
+            with open(str(json_file_path), 'r') as json_file:
                 data = json.load(json_file)
-                data['folder_path'] = new_folder_path
+                data['folder_path'] = str(new_folder_path)
                 data['lang'] = language
-            with open(json_file_path, 'w') as json_file:
+            with open(str(json_file_path), 'w') as json_file:
                 json.dump(data, json_file)
         
             QMessageBox.information(None, "Information", "Les paramètres ont été sauvegardés ! Veuillez redémarrer QGIS pour que les changements de langue soient pris en compte.")
@@ -407,7 +415,7 @@ class d4cAPI:
             QMessageBox.warning(None, "Attention", "Veuillez renseigner un chemin valide!")
     
     def openFolderDialog(self):
-        folder_path = QtWidgets.QFileDialog.getExistingDirectory(None, "Selectionner un dossier", os.path.expanduser("~"))
+        folder_path = QtWidgets.QFileDialog.getExistingDirectory(None, "Selectionner un dossier", str(pathlib.Path.home()))
         self.uiParams.lineEdit.setText(folder_path)
 
         
@@ -426,9 +434,9 @@ class d4cAPI:
     # Méthode principale du plugin
     def run(self):
         """Run method that performs all the real work"""
-        destination_folder = os.path.expanduser('~/.d4cplugin')  # Modifier le chemin selon vos besoins
-        json_file_path = os.path.join(destination_folder, 'logs.json')
-        if not(os.path.exists(json_file_path)):
+        destination_folder = str(pathlib.Path.home() / '.d4cplugin')  # Modifier le chemin selon vos besoins
+        json_file_path = pathlib.Path.home() / '.d4cplugin'/ 'history.json'
+        if not(pathlib.Path.exists(json_file_path)):
             data = {
                 "last_session": {
                     "sessions": []
@@ -545,13 +553,13 @@ class d4cAPI:
 
     def disableButtons(self):
         self.dlg.pushImportresource.setEnabled(False)
+        self.dlg.pushSetGeoParams.setEnabled(False)
         self.dlg.pushExportAsNewresource.setEnabled(False)
         self.dlg.pushExportAsExistingresource.setEnabled(False)
         self.dlg.pushDeleteResource.setEnabled(False)
         self.dlg.pushDeletedataset.setEnabled(False)
         self.dlg.pushInfos.setEnabled(False)
         self.dlg.checkPrevisu.setEnabled(False)
-        self.dlg.clearHistory.setEnabled(False)
 
 
     def enableButtons(self):
@@ -562,7 +570,7 @@ class d4cAPI:
         self.dlg.pushDeletedataset.setEnabled(True)
         self.dlg.pushInfos.setEnabled(True)
         self.dlg.checkPrevisu.setEnabled(True)
-        self.dlg.clearHistory.setEnabled(True)
+        self.dlg.pushSetGeoParams.setEnabled(True)
         
 
 
@@ -591,27 +599,28 @@ class d4cAPI:
     def setupIcons(self):
         
         # Icon Paths
-        arrow_bottom_icon_path = os.path.join(self.plugin_dir, 'img', 'arrow_bottom.png')
-        arrow_double_icon_path = os.path.join(self.plugin_dir, 'img', 'arrow_double.png')
-        arrow_top_icon_path = os.path.join(self.plugin_dir, 'img', 'arrow_top.png')
-        csv_icon_path = os.path.join(self.plugin_dir, 'img', 'csv_icon.png')
-        geojson_icon_path = os.path.join(self.plugin_dir, 'img', 'geojson_icon.png')
-        json_icon_path = os.path.join(self.plugin_dir, 'img', 'json_icon.png')
-        refresh_icon_path = os.path.join(self.plugin_dir, 'img', 'refresh_icon.png')
-        search_icon_path = os.path.join(self.plugin_dir, 'img', 'search_icon.png')
-        zip_icon_path = os.path.join(self.plugin_dir, 'img', 'zip_icon.png')
-        add_icon_path = os.path.join(self.plugin_dir, 'img', 'add_icon.png')
-        delete_icon_path = os.path.join(self.plugin_dir, 'img', 'delete_icon.png')
-        update_icon_path = os.path.join(self.plugin_dir, 'img', 'update_icon.png')
-        info_icon_path = os.path.join(self.plugin_dir, 'img', 'info_icon.png')
-        d4c_icon_path = os.path.join(self.plugin_dir, 'img', 'd4c_icon.png')
-        question_icon_path = os.path.join(self.plugin_dir, 'img', 'question_icon.png')
-        france_icon_path = os.path.join(self.plugin_dir, 'img', 'france_icon.png')
-        uk_icon_path = os.path.join(self.plugin_dir, 'img', 'uk_icon.png') 
-        data_gouv_icon_path = os.path.join(self.plugin_dir, 'img', 'data_gouv_icon.png')
-        ods_icon_path = os.path.join(self.plugin_dir, 'img', 'ods_icon.png')
-        ckan_icon_path = os.path.join(self.plugin_dir, 'img', 'ckan_icon.png')
-        geoloc_icon_path = os.path.join(self.plugin_dir, 'img', 'geoloc_icon.png')
+        arrow_bottom_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'arrow_bottom.png')
+        arrow_double_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'arrow_double.png')
+        arrow_top_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'arrow_top.png')
+        csv_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'csv_icon.png')
+        geojson_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'geojson_icon.png')
+        json_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'json_icon.png')
+        refresh_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'refresh_icon.png')
+        search_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'search_icon.png')
+        zip_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'zip_icon.png')
+        add_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'add_icon.png')
+        delete_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'delete_icon.png')
+        update_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'update_icon.png')
+        info_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'info_icon.png')
+        d4c_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'd4c_icon.png')
+        question_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'question_icon.png')
+        france_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'france_icon.png')
+        uk_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'uk_icon.png')
+        data_gouv_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'data_gouv_icon.png')
+        ods_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'ods_icon.png')
+        ckan_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'ckan_icon.png')
+        geoloc_icon_path = str(pathlib.Path(self.plugin_dir) / 'img' / 'geoloc_icon.png')
+
         # Init Icons
         arrow_bottom = QIcon(arrow_bottom_icon_path)
         arrow_double = QIcon(arrow_double_icon_path)
@@ -680,7 +689,7 @@ class d4cAPI:
 
 
     def read(self):
-        with open(self.plugin_dir + '/help/source/_static/const/temp/k_e_y_p_w_d.txt', 'rb') as file:
+        with open(str(self.plugin_dir / 'help'/'source'/'_static'/'const'/'temp'/'k_e_y_p_w_d.txt'), 'rb') as file:
             for line in file:
                 self.key = line
             
@@ -724,69 +733,65 @@ class d4cAPI:
             if not "success" in dataset:
                 self.show_error_message(self.tr('Aucun Jeu de Donnée Trouvé'))
 
-            if dataset['result']['state'] == 'deleted': 
-                self.show_error_message(self.tr('Aucun Jeu de Donnée Trouvé'))
-                return
+            # check if key 'state' exists 
+            if 'state' in dataset['result'].keys():
+                if dataset['result']['state'] == 'deleted': 
+                    self.show_error_message(self.tr('Aucun Jeu de Donnée Trouvé'))
+                    return
             
+            self.data_title = dataset['result']['title']
+            data_name = dataset['result']['name']
+            self.dlg.datasetId.setPlainText(data_name)
+            self.currentDataset_id = dataset['result']['id']
+            self.data_author = dataset['result']['author']
+            self.data_org = dataset['result']['organization']['title']
+            self.data_license =dataset['result']['license_title']
+            self.data_private = dataset['result']['private']
+            self.selectedDataPrivate = dataset['result']['private']
+            self.data_url =  dataset['result']['url']
+            
+            for resource in dataset['result']['resources']:
+                if resource['mimetype'] != "":
+                    item = QtWidgets.QListWidgetItem(resource['name'])
+                    self.dlg.resourcesList.setIconSize(QtCore.QSize(36, 36))
+                    if resource['format'] == 'CSV' or resource['mimetype'] == 'text/csv' or resource['name'].endswith('.csv'):
+                        item.setIcon(self.csv_icon)
+                        self.dlg.resourcesList.addItem(item)
+                    elif resource['format'] == 'GeoJSON' or resource['name'].endswith('.geojson') or resource['mimetype'] == 'application/geo+json':
+                        item.setIcon(self.geojson_icon)
+                        self.dlg.resourcesList.addItem(item)
+                    elif resource['name'].endswith('.json') or resource['mimetype'] == 'application/json' or resource['format'] == 'JSON' or resource['format'] == 'json':
+                        item.setIcon(self.json_icon)
+                        self.dlg.resourcesList.addItem(item)
+                    elif resource['name'].endswith('.zip'):
+                        item.setIcon(self.zip_icon)
+                        self.dlg.resourcesList.addItem(item)
+                    else:
+                        style = QApplication.style()
+                        icon = style.standardIcon(QStyle.SP_TitleBarContextHelpButton)
+                        item.setIcon(icon)
+                        self.dlg.resourcesList.addItem(item)
+                    
+                    url_file = dataset['result']['url'] + '/resource/' + resource['id'] + '/download/' + resource['name']
+                    self.resourceDict[resource['name']] = url_file
+                self.listExistingResourceById[resource['name']] = resource['id']
+            self.selectedDataId = dataset['result']['id']
+            self.selectedDataOrg = dataset['result']['organization']['name']
+            self.dlg.exportLine.setPlainText(data_name)
+            
+            self.showExportableLayers()
+            self.enableButtons()
+            self.enableSearchButtons()
+            if self.pwd == "":
+                self.dlg.tabWidget.setTabEnabled(1, False)
+                self.dlg.pushDeleteResource.setEnabled(False)
+                self.dlg.pushDeletedataset.setEnabled(False)
             else:
-                self.data_title = dataset['result']['title']
-                data_name = dataset['result']['name']
-                self.dlg.datasetId.setPlainText(data_name)
-                self.currentDataset_id = dataset['result']['id']
-                self.data_author = dataset['result']['author']
-                self.data_org = dataset['result']['organization']['title']
-                self.data_license =dataset['result']['license_title']
-                self.data_private = dataset['result']['private']
-                self.selectedDataPrivate = dataset['result']['private']
-                self.data_url =  dataset['result']['url']
-                
-                for resource in dataset['result']['resources']:
-                    if resource['mimetype'] != "":
-                        item = QtWidgets.QListWidgetItem(resource['name'])
-                        self.dlg.resourcesList.setIconSize(QtCore.QSize(36, 36))
-                        file_format = None
-                        if resource['format'] == 'CSV' or resource['mimetype'] == 'text/csv' or resource['name'].endswith('.csv'):
-                            item.setIcon(self.csv_icon)
-                            self.dlg.resourcesList.addItem(item)
-                            file_format = 'csv'
-                        elif resource['format'] == 'GeoJSON' or resource['name'].endswith('.geojson') or resource['mimetype'] == 'application/geo+json':
-                            item.setIcon(self.geojson_icon)
-                            self.dlg.resourcesList.addItem(item)
-                            file_format = 'geojson'
-                        elif resource['name'].endswith('.json') or resource['mimetype'] == 'application/json' or resource['format'] == 'JSON' or resource['format'] == 'json':
-                            item.setIcon(self.json_icon)
-                            self.dlg.resourcesList.addItem(item)
-                            file_format = 'json'
-                        elif resource['name'].endswith('.zip'):
-                            item.setIcon(self.zip_icon)
-                            self.dlg.resourcesList.addItem(item)
-                            file_format = 'zip'
-                        else:
-                            style = QApplication.style()
-                            icon = style.standardIcon(QStyle.SP_TitleBarContextHelpButton)
-                            item.setIcon(icon)
-                            self.dlg.resourcesList.addItem(item)
-                        
-                        url_file = dataset['result']['url'] + '/resource/' + resource['id'] + '/download/' + resource['name']
-                        self.resourceDict[resource['name']] = url_file
-                    self.listExistingResourceById[resource['name']] = resource['id']
-                self.selectedDataId = dataset['result']['id']
-                self.selectedDataOrg = dataset['result']['organization']['name']
-                self.dlg.exportLine.setPlainText(data_name)
-                
-                self.showExportableLayers()
-                self.enableButtons()
-                self.enableSearchButtons()
-                if self.pwd == "":
-                    self.dlg.tabWidget.setTabEnabled(1, False)
-                    self.dlg.pushDeleteResource.setEnabled(False)
-                    self.dlg.pushDeletedataset.setEnabled(False)
-                else:
-                    self.dlg.tabWidget.setTabEnabled(1, True)
-                    self.dlg.pushDeleteResource.setEnabled(True)
-                    self.dlg.pushDeletedataset.setEnabled(True)
-                self.saveSession()
-                self.updateHistory()
+                self.dlg.tabWidget.setTabEnabled(1, True)
+                self.dlg.pushDeleteResource.setEnabled(True)
+                self.dlg.pushDeletedataset.setEnabled(True)
+            self.saveSession()
+            self.updateHistory()
         else:
             self.show_error_message('Error : ' + str(response.status_code))
         
@@ -801,24 +806,25 @@ class d4cAPI:
         self.ui.password.setText(self.pwd)
         
         # Set up the destination folder
-        if not os.path.exists(os.path.expanduser("~") + '/.d4cplugin/'):
-            os.makedirs(os.path.expanduser("~") + '/.d4cplugin/')
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin'):
+            os.makedirs(pathlib.Path.home() / '.d4cplugin')
             
-        sites_file_path = os.path.join(os.path.expanduser("~") ,".d4cplugin", 'sites.json')
+        sites_file_path = pathlib.Path.home() / '.d4cplugin' / 'sites.json'
 
         self.ui.comboBox.clear()
-        if os.path.exists(sites_file_path):
-            with open(sites_file_path, 'r') as json_file:
+        self.ui.comboBox.addItem('--- Choisir un site ---')
+        if pathlib.Path.exists(sites_file_path):
+            with open(str(sites_file_path), 'r') as json_file:
                 data = json.load(json_file)
                 for sites in data['saved_sites']['sites']:
                     if sites['name'] == '':
                         self.ui.comboBox.addItem(sites['site_url'] + ' - ' + sites['username'])
                     else:
                         self.ui.comboBox.addItem(sites['name'])
-        if self.ui.comboBox.count() == 0:
-            self.ui.validLoadedSite.setEnabled(False)
-        else:
-            self.ui.validLoadedSite.setEnabled(True)
+        # if self.ui.comboBox.count() == 0:
+        #     self.ui.validLoadedSite.setEnabled(False)
+        # else:
+        #     self.ui.validLoadedSite.setEnabled(True)
         self.ui.logins_window.loginsEntered.connect(self.getD4Clogins)
         self.window.exec_()
         self.updateHistory()
@@ -895,7 +901,7 @@ class d4cAPI:
             else:
                 file_name = value
             # Set up the destination path
-            destination_path = os.path.join(destination_folder, file_name.replace('/', '_'))
+            destination_path = str(pathlib.Path(destination_folder) / pathlib.Path(file_name.replace('/', '_')))
 
             # Download the file
             try : 
@@ -960,19 +966,19 @@ class d4cAPI:
         vl = None
         csv_layer = QgsVectorLayer(destination_path, layer_name, "ogr")
         # Lire les énumérations de strings et créer les fichiers s'il n'existent pas
-        if not os.path.exists(self.plugin_dir + '/enums_geo.txt'):
-            with open(self.plugin_dir + '/enums_geo.txt', 'w') as file:
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin' / 'enums_geo.txt'):
+            with open(str(pathlib.Path.home() / '.d4cplugin' / 'enums_geo.txt'), 'w') as file:
                 file.write('')
 
-        if not os.path.exists(self.plugin_dir + '/enums_tuple_geo.txt'):
-            with open(self.plugin_dir + '/enums_tuple_geo.txt', 'w') as file:
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin' / 'enums_tuple_geo.txt'):
+            with open(str(pathlib.Path.home() / '.d4cplugin' / 'enums_tuple_geo.txt'), 'w') as file:
                 file.write('')
 
-        with open(os.path.expanduser('~/.d4cplugin') + '/enums_geo.txt', 'r') as file:
+        with open(str(pathlib.Path.home() / '.d4cplugin' / 'enums_geo.txt'), 'r') as file:
             enum_strings = [line.strip() for line in file]
 
         # Lire les énumérations de tuples
-        with open(os.path.expanduser('~/.d4cplugin') + '/enums_tuple_geo.txt', 'r') as file:
+        with open(str(pathlib.Path.home() / '.d4cplugin' / 'enums_tuple_geo.txt'), 'r') as file:
             enum_tuples = [tuple(line.strip().split(',')) for line in file]
 
         if not csv_layer.isValid():
@@ -1056,7 +1062,7 @@ class d4cAPI:
                         resourceID = self.dlg.resourcesList.currentItem().text()
                         siteField = self.dlg.siteField.toPlainText()
 
-                        cache_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt'
+                        cache_file_path = str(pathlib.Path.home() / '.d4cplugin' / 'enums_cache_jdd.txt')
                         with open(cache_file_path, 'r') as fichier:
                             lignes_cache = fichier.readlines()
                         
@@ -1082,7 +1088,7 @@ class d4cAPI:
                         elif self.dlg.radioCKAN.isChecked():
                             ODsource = 'CKAN'
 
-                        cache_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt'
+                        cache_file_path = str(pathlib.Path.home() / '.d4cplugin' / 'enums_cache_jdd.txt')
                         with open(cache_file_path, 'r') as fichier:
                             lignes_cache = fichier.readlines()
                         
@@ -1364,10 +1370,10 @@ class d4cAPI:
         try:
             files = os.listdir(directory_path)
             for file in files:
-                file_path = os.path.join(directory_path, file)
+                file_path = pathlib.Path(directory_path) / pathlib.Path(file)
                 if file_path not in list_openned_layers:
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)       
+                    if file_path.is_file():
+                        os.remove(str(file_path))       
             
             self.show_success_message(self.tr('Cache vidé avec succès'))
             
@@ -1442,10 +1448,12 @@ class d4cAPI:
             couche_path = couche.dataProvider().dataSourceUri().split('|')[0]
             # file to upload
             fichier = couche.dataProvider().dataSourceUri()
-            if couche_path.startswith('memory?') or couche_path.startswith('dbname='):
+            if not(couche_path.startswith('C:')):
                 # Si la couche est chargée en mémoire ou alors en db, l'enregistrer dans resources au format geojson
                 #try:
-                couche_path = self.saveFile_folder + '\\' +  couche.name().replace('.csv', '') + '.geojson'
+                fileName = couche.name().replace('.csv', '') + '.geojson'
+                path = pathlib.Path(self.saveFile_folder) / pathlib.Path(fileName)
+                couche_path = str(path)
 
                 self.save_layer_as_geojson(couche, couche_path)
                     
@@ -1454,7 +1462,7 @@ class d4cAPI:
                 #     return
                 fichier = couche_path
 
-            if not os.path.exists(couche_path):
+            if not pathlib.Path.exists(pathlib.Path(couche_path)):
                 self.show_error_message(self.tr('Erreur lors de la sauvegarde de la couche, veuillez l\'enregistrer sur le disque.'))
                 return
             if nom_couche.endswith('.geojson') or couche_path.endswith('.geojson'):
@@ -1599,12 +1607,13 @@ class d4cAPI:
                 # file to upload
                 fichier = couche.dataProvider().dataSourceUri()
                 
-                if couche_path.startswith('memory?') or couche_path.startswith('dbname='):
+                if not(couche_path.startswith('C:')):
                     # Si la couche est chargée en mémoire, l'enregistrer dans resources au format geojson
             
                     try: 
-
-                        couche_path = self.saveFile_folder + '\\' +  couche.name().replace('.csv', '') + '.geojson'
+                        fileName = couche.name().replace('.csv', '') + '.geojson'
+                        path = pathlib.Path(self.saveFile_folder) / pathlib.Path(fileName)
+                        couche_path = str(path)
                         
                         self.save_layer_as_geojson(couche, couche_path)
                         
@@ -1612,7 +1621,7 @@ class d4cAPI:
                         self.show_error_message(self.tr('Erreur lors de la sauvegarde de la couche, veuillez l\'enregistrer sur le disque.'), e)
                         return
                     fichier = couche_path
-                if not os.path.exists(couche_path):
+                if not pathlib.Path.exists(pathlib.Path(couche_path)):
                     self.show_error_message(self.tr('Erreur lors de la sauvegarde de la couche, veuillez l\'enregistrer sur le disque.'))
                     return
                 if nom_couche.endswith('.geojson') or couche_path.endswith('.geojson'):
@@ -1700,16 +1709,6 @@ class d4cAPI:
             self.show_info_message(self.tr('Veuillez sélectionner une ressource à remplacer'))
 
     def save_layer_as_geojson(self, layer, output_geojson_path):
-        # # Définir les options pour l'enregistrement GeoJSON
-        # options = QgsVectorFileWriter.SaveVectorOptions()
-        # options.driverName = "GeoJSON"
-        # options.fileEncoding = "UTF-8"
-        # options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
-
-        # # Si la référence spatiale est invalide, utilisez la référence spatiale par défaut (EPSG:4326)
-        # if layer.isValid():
-        #     # Enregistrer la couche au format GeoJSON
-        #     QgsVectorFileWriter.writeAsVectorFormat(layer, output_geojson_path, options)
         project = QgsProject.instance()
         # Initialiser l'application QGIS
         QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
@@ -1764,15 +1763,14 @@ class d4cAPI:
         datasets = self.dlg.datasetId.toPlainText()
 
         # Set up the destination folder
-        if not os.path.exists(os.path.expanduser("~") + '/.d4cplugin/'):
-            os.makedirs(os.path.expanduser("~") + '/.d4cplugin/')
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin'):
+            os.makedirs(str(pathlib.Path.home() / '.d4cplugin'))
             
-        # Chargez les sessions existantes depuis le fichier JSON
-        destination_folder = os.path.expanduser('~/.d4cplugin')  # Modifier le chemin selon vos besoins
-        json_file_path = os.path.join(destination_folder, 'logs.json')
+        # Chargez les sessions existantes depuis le fichier JSON # Modifier le chemin selon vos besoins
+        json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
         
         if os.path.exists(json_file_path):
-            with open(json_file_path, 'r') as json_file:
+            with open(str(json_file_path), 'r') as json_file:
                 data = json.load(json_file)
         else:
             data = {
@@ -1804,7 +1802,7 @@ class d4cAPI:
             data["last_session"]["sessions"].pop()  # Supprime la session la plus ancienne
 
         # Enregistrez les données mises à jour dans le fichier JSON
-        with open(json_file_path, 'w') as json_file:
+        with open(str(json_file_path), 'w') as json_file:
             json.dump(data, json_file, indent=4)
 
     # Sauvegarde les informations de sites
@@ -1815,14 +1813,14 @@ class d4cAPI:
 
         encrypted_password = self.fernet.encrypt(password.encode())
          # Set up the destination folder
-        if not os.path.exists(os.path.expanduser("~") + '/.d4cplugin/'):
-            os.makedirs(os.path.expanduser("~") + '/.d4cplugin/')
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin'):
+            os.makedirs(str(pathlib.Path.home() / '.d4cplugin'))
 
-        sites_file_path = os.path.join(os.path.expanduser("~"), '.d4cplugin', 'sites.json')
+        sites_file_path = pathlib.Path.home() / '.d4cplugin' / 'sites.json'
 
         if os.path.exists(sites_file_path):
             # Charger les données JSON existantes
-            with open(sites_file_path, 'r') as json_file:
+            with open(str(sites_file_path), 'r') as json_file:
                 site_data = json.load(json_file)
         else:
             site_data = {
@@ -1847,7 +1845,7 @@ class d4cAPI:
         site_data["saved_sites"]["sites"].append(new_site_info)
 
         # Enregistrer les données mises à jour dans le fichier sites.json
-        with open(sites_file_path, 'w') as json_file:
+        with open(str(sites_file_path), 'w') as json_file:
             json.dump(site_data, json_file, indent=4)
 
     # Actualise la liste des fichiers importés
@@ -1856,19 +1854,19 @@ class d4cAPI:
         self.dlg.historyList.clear()
         # Définir le chemin du fichier JSON
                 # Set up the destination folder
-        if not os.path.exists(os.path.expanduser("~") + '/.d4cplugin/'):
-            os.makedirs(os.path.expanduser("~") + '/.d4cplugin/')
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin'):
+            os.makedirs(str(pathlib.Path.home() / '.d4cplugin'))
             
-        destination_folder = os.path.join(os.path.expanduser("~"), '.d4cplugin')
-        json_file_path = os.path.join(destination_folder, 'logs.json')
-        json_sites_file_path = os.path.join(destination_folder, 'sites.json')
 
-        if os.path.exists(json_file_path) and os.path.exists(json_sites_file_path):
-            with open(json_file_path, 'r') as json_file:
+        json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
+        json_sites_file_path = pathlib.Path.home() / '.d4cplugin' / 'sites.json'
+
+        if pathlib.Path.exists(json_file_path) and pathlib.Path.exists(json_sites_file_path):
+            with open(str(json_file_path), 'r') as json_file:
                 data = json.load(json_file)
                 
         
-            with open(json_sites_file_path, 'r') as json_sites_file:
+            with open(str(json_sites_file_path), 'r') as json_sites_file:
                 data_sites = json.load(json_sites_file)
     
 
@@ -1887,13 +1885,12 @@ class d4cAPI:
 
     # Purger l'historique
     def clearHistory(self):
-        file_path = os.path.join(os.path.expanduser("~"), '.d4cplugin', 'logs.json')
+        file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
         
-        if os.path.isfile(file_path):
-            os.remove(file_path)
+        if file_path.is_file():
+            os.remove(str(file_path))
         
-            destination_folder = os.path.expanduser('~/.d4cplugin')  # Modifier le chemin selon vos besoins
-            json_file_path = os.path.join(destination_folder, 'logs.json')
+            json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
             data = {
                     "last_session": {
                         "sessions": []
@@ -1902,7 +1899,7 @@ class d4cAPI:
                     "folder_path" : self.saveFile_folder
                 }
                         # Enregistrez les données mises à jour dans le fichier JSON
-            with open(json_file_path, 'w') as json_file:
+            with open(str(json_file_path), 'w') as json_file:
                     json.dump(data, json_file, indent=4)
             self.updateHistory()
 
@@ -1912,15 +1909,13 @@ class d4cAPI:
         session_name = session.text().split(' => ')[0]
         sessionNb = self.dlg.historyList.currentRow()
         # Set up the destination folder
-        if not os.path.exists(os.path.expanduser("~") + '/.d4cplugin/'):
-            os.makedirs(os.path.expanduser("~") + '/.d4cplugin/')
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin'):
+            os.makedirs(pathlib.Path.home() / '.d4cplugin')
             
-        destination_folder = os.path.join(os.path.expanduser("~"), '.d4cplugin')
-        json_file_path = os.path.join(destination_folder, 'logs.json')
-
+        json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
         if not(session):
             return
-        with open(json_file_path, 'r') as json_file:
+        with open(str(json_file_path), 'r') as json_file:
             data = json.load(json_file)
             previousSit = data["last_session"]["sessions"][sessionNb]["site_url"]
             previousUsr = data["last_session"]["sessions"][sessionNb]["username"]
@@ -1971,8 +1966,9 @@ class d4cAPI:
                                 if theme not in theme_list:
                                     theme_list.append(theme)
                 
-                sites_file_path = os.path.join(os.path.expanduser("~"), '.d4cplugin', 'sites.json')
-                with open(sites_file_path, 'r') as json_file:
+                sites_file_path = pathlib.Path.home() / '.d4cplugin' / 'sites.json'
+
+                with open(str(sites_file_path), 'r') as json_file:
                     site_data = json.load(json_file)
                 sites = site_data["saved_sites"]["sites"]
                 i = 0
@@ -2081,8 +2077,9 @@ class d4cAPI:
         self.clearLayout(self.ui3.scrollLayout3)
 
         if itemNb != -1:
-            sites_file_path = os.path.join(os.path.expanduser("~"), '.d4cplugin', 'sites.json')
-            with open(sites_file_path, 'r') as json_file:
+            sites_file_path = pathlib.Path.home() / '.d4cplugin' / 'sites.json'
+
+            with open(str(sites_file_path), 'r') as json_file:
                 site_data = json.load(json_file)
                 sites = site_data["saved_sites"]["sites"]
                 self.sit = sites[itemNb]["site_url"]
@@ -2385,10 +2382,9 @@ class d4cAPI:
                     else:
                         self.show_success_message(self.tr('Dataset supprimé avec succès'))
                         # delete in sessions file
-                        destination_folder = os.path.expanduser('~/.d4cplugin')
-                        json_file_path = os.path.join(destination_folder, 'logs.json')
-                        if os.path.exists(json_file_path):
-                            with open(json_file_path, 'r') as json_file:
+                        json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
+                        if pathlib.Path.exists(json_file_path):
+                            with open(str(json_file_path), 'r') as json_file:
                                 data = json.load(json_file)
                             sessions = data["last_session"]["sessions"]
                             i = 0
@@ -2396,7 +2392,7 @@ class d4cAPI:
                                 if session["datasets"] == self.dlg.datasetId.toPlainText():
                                     sessions.pop(i)
                                             # Enregistrez les données mises à jour dans le fichier JSON
-                                    with open(json_file_path, 'w') as json_file:
+                                    with open(str(json_file_path), 'w') as json_file:
                                         json.dump(data, json_file, indent=4)
                                     break
                                 i+=1
@@ -2706,13 +2702,13 @@ class d4cAPI:
         if items != []:
             for item in items:
                 file_name = item
-                destination_path = os.path.join(self.plugin_dir,'resources', file_name)
+                destination_path = self.plugin_dir / 'resources' / file_name
                 if file_name.endswith('.csv'):
-                    self.importCSV(destination_path, file_name)
+                    self.importCSV(str(destination_path), file_name)
                 elif file_name.endswith('.geojson'):
-                    self.importGEOJSON(destination_path, file_name)
+                    self.importGEOJSON(str(destination_path), file_name)
                 elif file_name.endswith('.json'):
-                    self.importJSON(destination_path, file_name)
+                    self.importJSON(str(destination_path), file_name)
                 else:
                     continue
         
@@ -2727,7 +2723,15 @@ class d4cAPI:
         self.uiAllDatasets.datasetAllList.setGridSize(QtCore.QSize(100, 70))
         self.uiAllDatasets.datasetAllList.setWordWrap(True)
 
-        url = self.dlg.siteField.toPlainText()+ '/d4c/api/datasets/2.0/search?start=0&rows=1000'
+        urlNoAuth = self.dlg.siteField.toPlainText()+ '/d4c/api/datasets/2.0/search?start=0&rows=1000'
+        urlAuth = self.dlg.siteField.toPlainText()+ '/d4c/api/datasets/2.0/search?start=0&rows=1000&include_private=true'
+
+        # if user has a password
+        if self.pwd != '':
+            url = urlAuth
+        else:
+            url = urlNoAuth
+         
         if not(self.isAlldatasetsLoaded):
             self.Alldatasetlist = []
             try:
@@ -2862,6 +2866,7 @@ class d4cAPI:
         self.filterNonGeo(Qt.Checked)
         self.uiAllDatasets.checkDisplayGeo.stateChanged.connect(self.filterNonGeo)
         self.uiAllDatasets.pushFilter.clicked.connect(self.resetFilters)
+        self.uiAllDatasets.lineSearchTags.textChanged.connect(self.filter_keywords_AllDatasets)
         
         self.uiAllDatasets.datasetAllList.itemSelectionChanged.connect(self.detectMultipleSelection)
 
@@ -2875,6 +2880,17 @@ class d4cAPI:
         self.uiAllDatasets.checkAz.stateChanged.connect(self.sortDatasetAz)
         self.uiAllDatasets.checkZa.stateChanged.connect(self.sortDatasetZa)
         self.windowAllDatasets.exec_()
+
+    def filter_keywords_AllDatasets(self):
+
+        search_text = self.uiAllDatasets.lineSearchTags.text().strip().lower()
+
+        for index in range(self.uiAllDatasets.scrollLayout3.count()):
+            item = self.uiAllDatasets.scrollLayout3.itemAt(index).widget()
+
+            if isinstance(item, QtWidgets.QCheckBox):
+                item_text = item.text().lower()
+                item.setHidden(search_text not in item_text)
 
     def detectMultipleSelection(self):
         if len(self.uiAllDatasets.datasetAllList.selectedItems()) > 1:
@@ -2909,19 +2925,20 @@ class d4cAPI:
     def sortDatasetAz(self, state):
         if state == Qt.Checked:
             self.uiAllDatasets.datasetAllList.sortItems(Qt.AscendingOrder)
-            self.uiAllDatasets.checkZa.setEnabled(False)
+            self.uiAllDatasets.checkZa.setChecked(False)
         else:
-            self.filterDatasetviaCheckbox()
-            self.uiAllDatasets.checkZa.setEnabled(True)
+            if not(self.uiAllDatasets.checkZa.isChecked() or self.uiAllDatasets.checkAz.isChecked()):
+                self.filterDatasetviaCheckbox()
+            
 
 
     def sortDatasetZa(self, state):
         if state == Qt.Checked:
             self.uiAllDatasets.datasetAllList.sortItems(Qt.DescendingOrder)
-            self.uiAllDatasets.checkAz.setEnabled(False)
+            self.uiAllDatasets.checkAz.setChecked(False)
         else:
-            self.filterDatasetviaCheckbox()
-            self.uiAllDatasets.checkAz.setEnabled(True)
+            if not(self.uiAllDatasets.checkZa.isChecked() or self.uiAllDatasets.checkAz.isChecked()):
+                self.filterDatasetviaCheckbox()
 
     def filterDatasetviaCheckbox(self):
         
@@ -2985,11 +3002,17 @@ class d4cAPI:
             if hastheme and hasorg and hastag:
                 if "GeoJSON" in formats:
                     item = QtWidgets.QListWidgetItem(nom)
+                    #get the width of the item
+                    itemWidth = self.uiAllDatasets.datasetAllList.sizeHintForColumn(0)
+                    item.setSizeHint(QtCore.QSize(itemWidth, 70))
                     item.setIcon(self.geojson_icon)
                     item.setToolTip(nom)
                     self.uiAllDatasets.datasetAllList.addItem(item)
                 else:
                     item = QtWidgets.QListWidgetItem(nom)
+                    #get the width of the item
+                    itemWidth = self.uiAllDatasets.datasetAllList.sizeHintForColumn(0)
+                    item.setSizeHint(QtCore.QSize(itemWidth, 70))
                     item.setToolTip(nom)
                     self.uiAllDatasets.datasetAllList.addItem(item)
         
@@ -3021,11 +3044,17 @@ class d4cAPI:
         for i in range(len(self.Alldatasetlist)):
             if "GeoJSON" in self.Alldatasetlist[i][1]:
                 item = QtWidgets.QListWidgetItem(self.Alldatasetlist[i][0])
+                #get the width of the item
+                itemWidth = self.uiAllDatasets.datasetAllList.sizeHintForColumn(0)
+                item.setSizeHint(QtCore.QSize(itemWidth, 70))
                 item.setIcon(self.geojson_icon)
                 item.setToolTip(self.Alldatasetlist[i][0])
                 self.uiAllDatasets.datasetAllList.addItem(item)
             else:
                 item = QtWidgets.QListWidgetItem(self.Alldatasetlist[i][0])
+                #get the width of the item
+                itemWidth = self.uiAllDatasets.datasetAllList.sizeHintForColumn(0)
+                item.setSizeHint(QtCore.QSize(itemWidth, 70))
                 item.setToolTip(self.Alldatasetlist[i][0])
                 self.uiAllDatasets.datasetAllList.addItem(item)
             
@@ -3115,7 +3144,7 @@ class d4cAPI:
             else:
                 file_name = file_name
             
-            destination_path = os.path.join(destination_folder, file_name.replace('/', '_'))
+            destination_path = pathlib.Path(destination_folder / file_name.replace('/', '_'))
 
             # Download the file
             try : 
@@ -3123,7 +3152,7 @@ class d4cAPI:
 
                 if response.status_code == 200:
                     #write file content
-                    with open(destination_path, 'wb') as f:
+                    with open(str(destination_path), 'wb') as f:
                         f.write(response.content)
                 else:
                     self.show_error_message('Error downloading file : ' + str(response.status_code))
@@ -3131,17 +3160,17 @@ class d4cAPI:
                 #CSV import 
                 if file_name.endswith('.csv'):
 
-                    self.importCSV(destination_path, file_name)
+                    self.importCSV(str(destination_path), file_name)
                     
                 #JSON import
                 if file_name.endswith('.json'):
                     
-                    self.importJSON(destination_path, file_name)
+                    self.importJSON(str(destination_path), file_name)
 
                 #GeoJSON import
                 if file_name.endswith('.geojson'):
                     
-                    self.importGEOJSON(destination_path, file_name)
+                    self.importGEOJSON(str(destination_path), file_name)
 
             except requests.exceptions.RequestException as e:
                 # Gestion des erreurs de requête
@@ -3196,8 +3225,8 @@ class d4cAPI:
 
     def currentSiteIndex(self):
 
-        sites_file_path = os.path.join(os.path.expanduser("~"), '.d4cplugin', 'sites.json')
-        with open(sites_file_path, 'r') as json_file:
+        sites_file_path = pathlib.Path.home() / '.d4cplugin' / 'sites.json'
+        with open(str(sites_file_path), 'r') as json_file:
             site_data = json.load(json_file)
 
         sites = site_data["saved_sites"]["sites"]
@@ -3318,13 +3347,13 @@ class d4cAPI:
         else:
             lang = 'en'
         
-        destination_folder = os.path.expanduser('~/.d4cplugin')  # Modifier le chemin selon vos besoins
-        json_file_path = os.path.join(destination_folder, 'logs.json')
+        json_file_path = pathlib.Path.home() / '.d4cplugin' / 'history.json'
 
-        with open(json_file_path, 'r') as json_file:
+
+        with open(str(json_file_path), 'r') as json_file:
             data = json.load(json_file)
             data["lang"] = lang
-        with open(json_file_path, 'w') as json_file:
+        with open(str(json_file_path), 'w') as json_file:
             json.dump(data, json_file, indent=4)
         if lang == 'fr':
             self.show_info_message('Veuillez redémarrer QGIS pour appliquer les changements')
@@ -3342,9 +3371,10 @@ class d4cAPI:
         self.dlg.comboBoxLayer1F.clear()
         self.dlg.comboBoxLayer2F.clear()
         self.dlg.comboBoxLayerFPlus.clear()
-        dot_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'dot_icon.png'))
-        shape_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'shape_icon.png'))
-        line_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'line_icon.png'))
+
+        line_icon = QIcon(str(self.plugin_dir / 'img' /'line_icon.png'))
+        shape_icon = QIcon(str(self.plugin_dir / 'img' /'shape_icon.png'))
+        dot_icon = QIcon(str(self.plugin_dir / 'img' /'dot_icon.png'))
         
 
         for layer in exportable_layers:
@@ -3396,9 +3426,9 @@ class d4cAPI:
             self.layer1isSet = True
 
         self.dlg.comboBoxLayer2F.clear()
-        dot_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'dot_icon.png'))
-        shape_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'shape_icon.png'))
-        line_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'line_icon.png'))
+        line_icon = QIcon(str(self.plugin_dir / 'img' /'line_icon.png'))
+        shape_icon = QIcon(str(self.plugin_dir / 'img' /'shape_icon.png'))
+        dot_icon = QIcon(str(self.plugin_dir / 'img' /'dot_icon.png'))
         #Ajouter à la combobox 2 les layers avec la même géométrie sauf celui choisi : 
         exportable_layers = QgsProject.instance().mapLayers().values()
         for layer in exportable_layers:
@@ -3444,9 +3474,9 @@ class d4cAPI:
         else: 
             self.dlg.layersListF.addItem(self.dlg.comboBoxLayer2F.currentText())
             self.layer2isSet = True
-        dot_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'dot_icon.png'))
-        shape_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'shape_icon.png'))
-        line_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'line_icon.png'))
+        line_icon = QIcon(str(self.plugin_dir / 'img' /'line_icon.png'))
+        shape_icon = QIcon(str(self.plugin_dir / 'img' /'shape_icon.png'))
+        dot_icon = QIcon(str(self.plugin_dir / 'img' /'dot_icon.png'))
         
         exportable_layers = QgsProject.instance().mapLayers().values()
         for layer in exportable_layers:
@@ -3494,9 +3524,9 @@ class d4cAPI:
         text = self.dlg.layersListF.item(index).text()
         if index > 1:
             self.dlg.layersListF.takeItem(index)
-        dot_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'dot_icon.png'))
-        shape_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'shape_icon.png'))
-        line_icon = QIcon(os.path.join(self.plugin_dir, 'img', 'line_icon.png'))
+        line_icon = QIcon(str(self.plugin_dir / 'img' /'line_icon.png'))
+        shape_icon = QIcon(str(self.plugin_dir / 'img' /'shape_icon.png'))
+        dot_icon = QIcon(str(self.plugin_dir / 'img' /'dot_icon.png'))
         if self.getSelectionType(text) == 'GeometryType.Point':
             icon = dot_icon
         elif self.getSelectionType(text) == 'GeometryType.LineString':
@@ -3532,8 +3562,8 @@ class d4cAPI:
                         layers.append(couche)
         
         result_layer_name = self.dlg.layerNameF.text()
-
-        result_layer_path = self.saveFile_folder + '/' + result_layer_name + '.geojson'
+        path = pathlib.Path(self.saveFile_folder) / pathlib.Path(result_layer_name + '.geojson')
+        result_layer_path = str(path)
         if self.dlg.comboBoxOperation.currentIndex() == 0:
             self.fusionner_couches_couche(result_layer_path, layers)
         elif self.dlg.comboBoxOperation.currentIndex() == 1:
@@ -3825,9 +3855,9 @@ class d4cAPI:
     def callD4Csearch(self):
         
         site_index = self.dlg.D4CcomboBox.currentIndex()
-        file_path = self.plugin_dir + '/D4C_sites.json'
+        file_path = self.plugin_dir / 'D4C_sites.json'
 
-        with open(file_path, 'r') as json_file:
+        with open(str(file_path), 'r') as json_file:
             data = json.load(json_file)
             site_url = data["sites"][site_index]["site_url"]
         
@@ -4026,7 +4056,8 @@ class d4cAPI:
             if not resource_name.endswith('.' + resource_format):
                 resource_name = resource_name + '.' + resource_format
             i = 1
-            while os.path.exists(os.path.join(destination_folder, resource_name.replace('/', '_'))):
+            pathfile = pathlib.Path(destination_folder) / pathlib.Path(resource_name.replace('/', '_'))
+            while pathlib.Path.exists( pathfile ):
                 if i == 1:
                     resource_name = resource_name.replace('.' + resource_format, '')
                     resource_name = resource_name + '_' + str(i) + '.' + resource_format
@@ -4038,14 +4069,14 @@ class d4cAPI:
             
             
  
-            with open(os.path.join(destination_folder, resource_name.replace('/', '_')), 'wb') as f:
+            with open(str(pathfile), 'wb') as f:
                 f.write(response.content)
             # add to qgis workspace
             if resource_format == 'csv' or resource_format == 'CSV' or resource_format == 'Csv':
-                self.importCSV(os.path.join(destination_folder, resource_name.replace('/', '_')), resource_name)
+                self.importCSV(str(pathfile), resource_name)
             else:
 
-                layer = QgsVectorLayer(os.path.join(destination_folder, resource_name.replace('/', '_')), resource_name, 'ogr')
+                layer = QgsVectorLayer(str(pathfile), resource_name, 'ogr')
                 if layer.isValid():
                     QgsProject.instance().addMapLayer(layer)
                     
@@ -4136,8 +4167,16 @@ class d4cAPI:
     # Mise à jour de l'apperçu
     def updatePreviewOpenData(self):
 
+
         selected_resource = self.dlg.listResourceOpenData.currentItem()
-        
+
+        # No need to reload if the previous resource is the same
+        if self.previousOpenDataResource is not None:
+            if self.previousOpenDataResource == selected_resource.text():
+                return
+        self.previousOpenDataResource = selected_resource.text()
+            
+
         if selected_resource:
             data = None
             self.dlg.tableWidget.clear()
@@ -4226,8 +4265,8 @@ class d4cAPI:
         
     # Ajoute les sites openData présent dans D4C_sites.json
     def setupD4CcomboBox(self):
-        file_path = self.plugin_dir + '/D4C_sites.json'
-        with open(file_path, 'r') as f:
+        file_path = self.plugin_dir / 'D4C_sites.json'
+        with open(str(file_path), 'r') as f:
             data = json.load(f)
             for site in data['sites']:
                 self.dlg.D4CcomboBox.addItem(site['name'])
@@ -4251,7 +4290,22 @@ class d4cAPI:
 
         self.uiGeoParams.lineGeo2.setHidden(True)
         self.uiGeoParams.label_lon.setHidden(True)
-        
+        if self.dlg.tabWidget.currentIndex() == 0:
+            if self.dlg.resourcesList.currentItem() is None:
+                return
+            selected_resource = self.dlg.resourcesList.currentItem()
+            if selected_resource:
+                selected_resource = selected_resource.text()        
+                url = self.resourceDict[selected_resource]
+                if not(url.endswith('.csv')):
+                    return
+        if self.dlg.tabWidget.currentIndex() == 3:
+            if self.dlg.listResourceOpenData.currentItem() is None:
+                return
+            # if preview is not available
+            if self.dlg.tableWidget.item(0,1 ) is None:
+                return 
+            
         # Récupérer les headers du tablewidget 
         for i in range(self.dlg.tableWidget.columnCount()):
             if self.dlg.tableWidget.horizontalHeaderItem(i):
@@ -4264,8 +4318,8 @@ class d4cAPI:
         self.uiGeoParams.pushCancel.clicked.connect(self.windowGeoParams.close)
         self.uiGeoParams.pushDeleteWord.clicked.connect(self.openDeleteGeoParam)
         
-        if not os.path.exists(os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt'):
-                with open(os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt', 'w') as fichier:
+        if not pathlib.Path.exists(pathlib.Path.home() / '.d4cplugin' /  'enums_cache_jdd.txt'):
+                with open(str(pathlib.Path.home() / '.d4cplugin' /  'enums_cache_jdd.txt'), 'w') as fichier:
                     fichier.write('')
         
         #Mettre les paramètres de la géolocalisation si ils sont enregistrés
@@ -4275,7 +4329,7 @@ class d4cAPI:
             siteField = self.dlg.siteField.toPlainText()
 
             
-            cache_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt'
+            cache_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_cache_jdd.txt')
             with open(cache_file_path, 'r') as fichier:
                 lignes_cache = fichier.readlines()
             
@@ -4303,7 +4357,7 @@ class d4cAPI:
             elif self.dlg.radioCKAN.isChecked():
                 ODsource = 'CKAN'
 
-            cache_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt'
+            cache_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_cache_jdd.txt')
             with open(cache_file_path, 'r') as fichier:
                 lignes_cache = fichier.readlines()
             
@@ -4334,7 +4388,7 @@ class d4cAPI:
             geolabel = self.uiGeoParams.lineGeo1.currentText() 
 
             # Chemin du fichier d'énumération
-            enum_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_geo.txt'
+            enum_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_geo.txt')
             
             # Lire les données actuelles du fichier
             with open(enum_file_path, 'r') as fichier:
@@ -4346,7 +4400,7 @@ class d4cAPI:
                 lignes.append(geolabel + '\n')
             
             # Ajouter dans le cache
-            cache_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt'
+            cache_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_cache_jdd.txt')
 
             # Lire les données actuelles du fichier
             with open(cache_file_path, 'r') as fichier:
@@ -4408,7 +4462,7 @@ class d4cAPI:
                 self.show_info_message(self.tr('Veuillez entrer des noms de colonne différents'))
                 return
             geolabel = (self.uiGeoParams.lineGeo1.currentText(), self.uiGeoParams.lineGeo2.currentText())
-            enum_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_tuple_geo.txt'
+            enum_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_tuple_geo.txt')
 
             # Lire les données actuelles du fichier
             with open(enum_file_path, 'r') as fichier:
@@ -4421,7 +4475,7 @@ class d4cAPI:
                 lignes.append(','.join(geolabel) + '\n')
             
             # Ajouter dans le cache
-            cache_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_cache_jdd.txt'
+            cache_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_cache_jdd.txt')
 
             # Lire les données actuelles du fichier
             with open(cache_file_path, 'r') as fichier:
@@ -4491,14 +4545,14 @@ class d4cAPI:
         self.uiDeleteGeoParam = Ui_DeleteGeoParam()
         self.uiDeleteGeoParam.setupUi(self.windowDeleteGeoParam)
 
-        with open(os.path.expanduser('~/.d4cplugin') + '/enums_geo.txt', 'r') as fichier:
+        with open(str(pathlib.Path.home() / '.d4cplugin' /  'enums_geo.txt'), 'r') as fichier:
             lignes = fichier.readlines()
             for ligne in lignes:
                 self.uiDeleteGeoParam.comboBox_wordToDelete.addItem(ligne.replace('\n', ''))
         
         self.uiDeleteGeoParam.comboBox_wordToDelete.addItem('------ Tuples ------')
 
-        with open(os.path.expanduser('~/.d4cplugin') + '/enums_tuple_geo.txt', 'r') as fichier:
+        with open(str(pathlib.Path.home() / '.d4cplugin' /  'enums_tuple_geo.txt'), 'r') as fichier:
             lignes = fichier.readlines()
             for ligne in lignes:
                 self.uiDeleteGeoParam.comboBox_wordToDelete.addItem(ligne.replace('\n', ''))
@@ -4519,7 +4573,7 @@ class d4cAPI:
             return
         
         if ',' in word_to_delete:
-            enum_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_tuple_geo.txt'
+            enum_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_tuple_geo.txt')
 
             # Lire les données actuelles du fichier
             with open(enum_file_path, 'r') as fichier:
@@ -4537,7 +4591,7 @@ class d4cAPI:
                 for ligne in tuples_existants:
                     fichier.write(','.join(ligne) + '\n')
         else:
-            enum_file_path = os.path.expanduser('~/.d4cplugin') + '/enums_geo.txt'
+            enum_file_path = str(pathlib.Path.home() / '.d4cplugin' /  'enums_geo.txt')
 
             # Lire les données actuelles du fichier
             with open(enum_file_path, 'r') as fichier:

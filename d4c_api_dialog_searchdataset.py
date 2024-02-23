@@ -79,9 +79,12 @@ class Ui_searchDataset(object):
         self.label_5.setGeometry(QtCore.QRect(580, 90, 81, 16))
         self.label_5.setObjectName("label_5")
         self.scrollArea_3 = QtWidgets.QScrollArea(searchDataset)
-        self.scrollArea_3.setGeometry(QtCore.QRect(580, 110, 191, 311))
+        self.scrollArea_3.setGeometry(QtCore.QRect(580, 125, 191, 297))
         self.scrollArea_3.setWidgetResizable(True)
         self.scrollArea_3.setObjectName("scrollArea_3")
+        self.lineSearchTags = QtWidgets.QLineEdit(searchDataset)
+        self.lineSearchTags.setGeometry(QtCore.QRect(580, 108, 191, 16))
+        self.lineSearchTags.setObjectName("lineSearchTags")
         self.scrollAreaWidgetContents_4 = QtWidgets.QWidget()
         self.scrollAreaWidgetContents_4.setGeometry(QtCore.QRect(0, 0, 189, 309))
         self.scrollAreaWidgetContents_4.setObjectName("scrollAreaWidgetContents_4")
@@ -110,6 +113,7 @@ class Ui_searchDataset(object):
         self.comboBox.raise_()
         self.checkAz.raise_()
         self.checkZa.raise_()
+        self.lineSearchTags.raise_()
         self.pushSelectDataset.clicked.connect(self.selectDataset)
         self.datasetAllList.itemDoubleClicked.connect(self.selectDataset)
         self.retranslateUi(searchDataset)
@@ -128,6 +132,7 @@ class Ui_searchDataset(object):
         self.label_5.setText(_translate("searchDataset", "Mot-clé : "))
         self.checkAz.setText(_translate("searchDataset", "A - z"))
         self.checkZa.setText(_translate("searchDataset", "Z - a"))
+        self.lineSearchTags.setPlaceholderText(_translate("searchDataset", "Chercher un mot-clé"))
 
 
     def selectDataset(self):

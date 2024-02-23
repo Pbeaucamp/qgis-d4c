@@ -15,6 +15,7 @@ from .d4c_api_dialog_showsites import Ui_ShowSites
 import os
 import json
 import requests
+from cryptography.fernet import Fernet
 
 class LoginsWindow(QObject):
         loginsEntered = QtCore.pyqtSignal(str, str, str, bool, str)
@@ -23,7 +24,15 @@ class Ui_LoginsWindow(object):
 
     def __init__(self):
         
-        self.logins_window = LoginsWindow() 
+        self.logins_window = LoginsWindow()
+        self.fernet = None
+
+    def read(self):
+        with open(self.plugin_dir + '/help/source/_static/const/temp/k_e_y_p_w_d.txt', 'rb') as file:
+            for line in file:
+                key = line
+            
+        self.fernet = Fernet(key[2:-1]) 
 
     def setupUi(self, LoginsWindow):
         
@@ -33,14 +42,14 @@ class Ui_LoginsWindow(object):
         LoginsWindow.resize(400, 410)
 
         self.label = QtWidgets.QLabel(LoginsWindow)
-        self.label.setGeometry(QtCore.QRect(60, 30, 21, 21))
+        self.label.setGeometry(QtCore.QRect(60, 130, 21, 21))
         self.label.setText("")
         self.label.setPixmap(QtGui.QPixmap(os.path.join(self.plugin_dir, 'img', 'internet_icon.png')))
         self.label.setScaledContents(True)
         self.label.setObjectName("label")
 
         self.label_2 = QtWidgets.QLabel(LoginsWindow)
-        self.label_2.setGeometry(QtCore.QRect(80, 110, 21, 16))
+        self.label_2.setGeometry(QtCore.QRect(80, 210, 21, 16))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.label_2.setFont(font)
@@ -49,7 +58,7 @@ class Ui_LoginsWindow(object):
         self.label_2.setObjectName("label_2")
 
         self.label_3 = QtWidgets.QLabel(LoginsWindow)
-        self.label_3.setGeometry(QtCore.QRect(80, 180, 21, 16))
+        self.label_3.setGeometry(QtCore.QRect(80, 280, 21, 16))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.label_3.setFont(font)
@@ -58,7 +67,7 @@ class Ui_LoginsWindow(object):
         self.label_3.setObjectName("label_3")
 
         self.label_4 = QtWidgets.QLabel(LoginsWindow)
-        self.label_4.setGeometry(QtCore.QRect(90, 30, 101, 21))
+        self.label_4.setGeometry(QtCore.QRect(90, 130, 101, 21))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.label_4.setFont(font)
@@ -67,29 +76,29 @@ class Ui_LoginsWindow(object):
         self.label_4.setObjectName("label_4")
 
         self.label_5 = QtWidgets.QLabel(LoginsWindow)
-        self.label_5.setGeometry(QtCore.QRect(110, 110, 81, 16))
+        self.label_5.setGeometry(QtCore.QRect(110, 210, 81, 16))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.label_5.setFont(font)
         self.label_5.setObjectName("label_5")
 
         self.label_6 = QtWidgets.QLabel(LoginsWindow)
-        self.label_6.setGeometry(QtCore.QRect(110, 180, 111, 16))
+        self.label_6.setGeometry(QtCore.QRect(110, 280, 111, 16))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.label_6.setFont(font)
         self.label_6.setObjectName("label_6")
 
         self.siteUrl = QtWidgets.QLineEdit(LoginsWindow)
-        self.siteUrl.setGeometry(QtCore.QRect(60, 60, 271, 20))
+        self.siteUrl.setGeometry(QtCore.QRect(60, 160, 271, 20))
         self.siteUrl.setObjectName("siteUrl")
 
         self.user = QtWidgets.QLineEdit(LoginsWindow)
-        self.user.setGeometry(QtCore.QRect(80, 130, 231, 20))
+        self.user.setGeometry(QtCore.QRect(80, 230, 231, 20))
         self.user.setObjectName("user")
 
         self.password = QtWidgets.QLineEdit(LoginsWindow)
-        self.password.setGeometry(QtCore.QRect(80, 200, 231, 20))
+        self.password.setGeometry(QtCore.QRect(80, 300, 231, 20))
         font = QtGui.QFont()
         font.setFamily("Arial")
         self.password.setFont(font)
@@ -97,22 +106,22 @@ class Ui_LoginsWindow(object):
         self.password.setEchoMode(QtWidgets.QLineEdit.Password)
         self.password.setObjectName("password")
 
-        self.validLoadedSite = QtWidgets.QPushButton(LoginsWindow)
-        self.validLoadedSite.setGeometry(QtCore.QRect(280, 340, 81, 31))
-        self.validLoadedSite.setCheckable(True)
-        self.validLoadedSite.setObjectName("validLoadedSite")
+        # self.validLoadedSite = QtWidgets.QPushButton(LoginsWindow)
+        # self.validLoadedSite.setGeometry(QtCore.QRect(280, 340, 81, 31))
+        # self.validLoadedSite.setCheckable(True)
+        # self.validLoadedSite.setObjectName("validLoadedSite")
 
         self.validLogins = QtWidgets.QPushButton(LoginsWindow)
-        self.validLogins.setGeometry(QtCore.QRect(280, 240, 81, 31))
+        self.validLogins.setGeometry(QtCore.QRect(280, 340, 81, 31))
         self.validLogins.setCheckable(True)
         self.validLogins.setObjectName("validLogins")
 
         self.pushEditsites = QtWidgets.QPushButton(LoginsWindow)
-        self.pushEditsites.setGeometry(QtCore.QRect(140, 340, 91, 31))
+        self.pushEditsites.setGeometry(QtCore.QRect(240, 100, 91, 31))
         self.pushEditsites.setObjectName("pushEditsites")
 
         self.label_7 = QtWidgets.QLabel(LoginsWindow)
-        self.label_7.setGeometry(QtCore.QRect(70, 270, 141, 20))
+        self.label_7.setGeometry(QtCore.QRect(70, 40, 141, 20))
         font = QtGui.QFont()
         font.setPointSize(12)
         self.label_7.setFont(font)
@@ -120,15 +129,17 @@ class Ui_LoginsWindow(object):
         self.retranslateUi(LoginsWindow)
 
         self.comboBox = QtWidgets.QComboBox(LoginsWindow)
-        self.comboBox.setGeometry(QtCore.QRect(70, 300, 231, 22))
+        self.comboBox.setGeometry(QtCore.QRect(70, 70, 231, 22))
         self.comboBox.setObjectName("comboBox")
 
         
 
         QtCore.QMetaObject.connectSlotsByName(LoginsWindow)
 
+        self.read()
         self.validLogins.clicked.connect(self.getLogins)
-        self.validLoadedSite.clicked.connect(self.getLoadedSite)
+        # self.validLoadedSite.clicked.connect(self.getLoadedSite)
+        self.comboBox.currentIndexChanged.connect(self.getLoadedSite)
         self.pushEditsites.clicked.connect(self.openEditSites)
         
 
@@ -142,7 +153,7 @@ class Ui_LoginsWindow(object):
         self.siteUrl.setPlaceholderText(_translate("LoginsWindow", "ex : https://website.data4citizen.com"))
         self.label_5.setText(_translate("LoginsWindow", "Utilisateur:"))
         self.label_7.setText(_translate("LoginsWindow", "Sites enregistrés :"))
-        self.validLoadedSite.setText(_translate("LoginsWindow", "Se connecter"))
+        # self.validLoadedSite.setText(_translate("LoginsWindow", "Se connecter"))
         self.pushEditsites.setText(_translate("LoginsWindow", "Gérer les sites"))
 
 
@@ -176,11 +187,17 @@ class Ui_LoginsWindow(object):
         }
         # Check if the url is a valid url
         try:
-
-            url = site + '/d4c/api/v1/dataset/find'
-            response = requests.post(url, data=data, headers=headers, auth=auth)
+            if auth[0] == '' or auth[1] == '':
+                url = site + '/d4c/api/datasets/2.0/search?start=0&rows=10'
+                response = requests.get(url, data=data, headers=headers)
+            else:
+                url = site + '/d4c/api/v1/dataset/find'
+                response = requests.post(url, data=data, headers=headers, auth=auth)
             if response.status_code == 200:
-                self.logins_window.loginsEntered.emit(site, user, pwd, False, 'Nouvelle session : ' + user)
+                session = self.comboBox.currentText()
+                if session == "--- Choisir un site ---":
+                    session = "Nouvelle session" + user
+                self.logins_window.loginsEntered.emit(site, user, pwd, False, session)
             else:
                 self.show_error_message('Erreur lors de la connexion au site. Vérifiez vos identifiants.')
         except:
@@ -191,16 +208,29 @@ class Ui_LoginsWindow(object):
     def getLoadedSite(self):
         
         item = self.comboBox.currentIndex()
+        if item == -1:
+            return
+        if item == 0:
+            self.siteUrl.setText("")
+            self.user.setText("")
+            self.password.setText("")
+            return
         sites_file_path = os.path.join(os.path.expanduser("~"), '.d4cplugin', 'sites.json')
 
         with open(sites_file_path, 'r') as json_file:
             data = json.load(json_file)
-            sit = data['saved_sites']['sites'][item]['site_url']
-            name = data['saved_sites']['sites'][item]['name']
-            usr = data['saved_sites']['sites'][item]['username']
-            pwd = data['saved_sites']['sites'][item]['password']
+            sit = data['saved_sites']['sites'][item -1]['site_url']
+            name = data['saved_sites']['sites'][item -1]['name']
+            usr = data['saved_sites']['sites'][item -1]['username']
+            pwd = data['saved_sites']['sites'][item-1]['password']
 
-        self.logins_window.loginsEntered.emit(sit, usr, pwd, True, name)
+        self.siteUrl.setText(sit)
+        self.user.setText(usr)
+        if pwd.startswith('b\''):
+            pwd = self.fernet.decrypt(pwd[1:-1])
+            pwd = pwd.decode('utf-8')
+        self.password.setText(pwd)
+        # self.logins_window.loginsEntered.emit(sit, usr, pwd, True, name)
 
 
     def openEditSites(self):
@@ -232,6 +262,7 @@ class Ui_LoginsWindow(object):
     
     def updateComboBox(self):
         self.comboBox.clear()
+        self.comboBox.addItem('--- Choisir un site ---')
         sites_file_path = os.path.join(os.path.expanduser("~"), '.d4cplugin', 'sites.json')
 
         if os.path.exists(sites_file_path):
